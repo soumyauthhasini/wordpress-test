@@ -97,3 +97,81 @@ function SWD_register_taxonomy(){
 								?>
 								
 								<?php echo get_term_link( $wsc->slug, $wsc->taxonomy );?>
+
+
+
+                                // Register custom REST API endpoint for retrieving books
+function custom_get_books_endpoint() {
+    register_rest_route( 'custom/v1', '/books', array(
+        'methods'   => 'GET',
+        'callback'  => 'custom_get_books_callback',
+    ));
+}
+add_action( 'rest_api_init', 'custom_get_books_endpoint' );
+
+// Callback function to handle the GET request for retrieving books
+function custom_get_books_callback( $request ) {
+    $args = array(
+        'post_type'      => 'book', // Assuming 'book' is the custom post type
+        'posts_per_page' => -1,
+    );
+
+    $books_query = new WP_Query( $args );
+    $books = $books_query->posts;
+
+    // Prepare response data
+    $response_data = array();
+
+    foreach ( $books as $book ) {
+        $response_data[] = array(
+            'id'       => $book->ID,
+            'title'    => $book->post_title,
+            'author'   => get_post_meta( $book->ID, 'author', true ), // Assuming 'author' is a custom field
+            'excerpt'  => $book->post_excerpt,
+            'content'  => $book->post_content,
+            // Add more fields as needed
+        );
+    }
+
+    // Return a JSON response
+    return rest_ensure_response( $response_data );
+}
+
+
+//========= Post Published
+
+// Register webhook endpoint to receive data from Site 1
+add_action( 'rest_api_init', function () {
+    register_rest_route( 'site2/v1', '/webhook', array(
+        'methods' => 'POST',
+        'callback' => 'handle_webhook_data',
+    ) );
+} );
+
+// Function to handle data received from Site 1's webhook
+function handle_webhook_data( $request ) {
+    // Retrieve data from Site 1's REST API endpoint
+    $response = wp_remote_get( 'https://site1.com/wp-json/custom/v1/data' );
+
+    if ( is_wp_error( $response ) ) {
+        return new WP_Error( 'site1_error', 'Error fetching data from Site 1', array( 'status' => 500 ) );
+    }
+
+    $data = json_decode( wp_remote_retrieve_body( $response ), true );
+
+    // Create a new post on Site 2
+    $post_data = array(
+        'post_title'    => $data['title'],
+        'post_content'  => $data['content'],
+        'post_status'   => 'publish',
+        // Add more fields as needed
+    );
+
+    $post_id = wp_insert_post( $post_data );
+
+    if ( is_wp_error( $post_id ) ) {
+        return new WP_Error( 'site2_error', 'Error creating post on Site 2', array( 'status' => 500 ) );
+    }
+
+    return new WP_REST_Response( 'Post created on Site 2', 200 );
+}
