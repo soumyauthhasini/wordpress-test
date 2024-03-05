@@ -175,3 +175,45 @@ function handle_webhook_data( $request ) {
 
     return new WP_REST_Response( 'Post created on Site 2', 200 );
 }
+
+// Token
+// Register custom REST API endpoint with token authentication
+function custom_api_get_data() {
+    register_rest_route( 'custom/v1', '/data', array(
+        'methods'   => 'GET',
+        'callback'  => 'custom_get_data_callback',
+        'permission_callback' => 'jwt_auth_validate_token', // Require token authentication
+    ));
+}
+add_action( 'rest_api_init', 'custom_api_get_data' );
+
+
+// Example function to fetch data from the custom endpoint
+function fetchDataFromCustomEndpoint() {
+    // Replace 'YOUR_TOKEN' with the actual JWT token obtained from your WordPress site
+    const token = 'YOUR_TOKEN';
+    
+    // Endpoint URL
+    const endpointUrl = 'https://yourwordpresssite.com/wp-json/custom/v1/data';
+    
+    // Fetch data from the endpoint
+    fetch(endpointUrl, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to fetch data');
+        }
+        return response.json();
+    })
+    .then(data => {
+        // Process the retrieved data
+        console.log(data);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
